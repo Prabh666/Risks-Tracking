@@ -1,0 +1,1567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Risk Dashboard</title>
+<style>
+  :root{
+    color-scheme: light;
+    --page:#F4F2F9; --card:#FFFFFF; --line:#E3DFF0; --line2:#CFC8E6;
+    --ink:#1B1730; --muted:#5A5470; --faint:#807A96;
+    --plum:#4B2E83; --plum-deep:#2F1D5C; --plum-tint:#F0EBFA;
+    --crit:#C2183B; --high:#DA6A0B; --med:#B08800; --low:#0F8A5F;
+    --critBg:#FCEBEE; --highBg:#FDF0E4; --medBg:#FBF4DE; --lowBg:#E6F5EE;
+    --shadow:0 1px 2px rgba(47,29,92,.05), 0 8px 24px -18px rgba(47,29,92,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--page);color:var(--ink);
+    font:15px/1.5 Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+  button{font:inherit;color:inherit;cursor:pointer}
+  :focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+  .num{font-variant-numeric:tabular-nums}
+  .empty{margin:0;color:var(--faint);font-size:13.5px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+  /* header */
+  header{background:var(--plum-deep);color:#fff;padding:14px 0}
+  .hrow{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+  header h1{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+  header p{margin:2px 0 0;font-size:12.5px;color:#CFC4EA}
+  .tools{display:flex;flex-wrap:wrap;gap:8px}
+  .tool{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);color:#fff;
+    border-radius:8px;height:32px;padding:0 12px;font-size:13px;display:inline-flex;align-items:center;cursor:pointer}
+  .tool:hover{background:rgba(255,255,255,.22)}
+
+  /* filter bar */
+  .bar{background:var(--card);border-bottom:1px solid var(--line);padding:10px 0;position:sticky;top:0;z-index:6}
+  .brow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  input[type=search]{height:34px;border:1px solid var(--line2);border-radius:8px;padding:0 11px;
+    font:inherit;font-size:14px;flex:1 1 220px;max-width:300px;background:#fff;color:var(--ink)}
+  .chip{border:1px solid var(--line2);background:#fff;border-radius:999px;height:30px;padding:0 13px;
+    font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .chip:hover{border-color:var(--plum)}
+  .chip.on{background:var(--plum);border-color:var(--plum);color:#fff;font-weight:600}
+  .chip .n{opacity:.75;font-size:12px}
+  .clear{background:none;border:0;color:var(--plum);font-size:13px;font-weight:600;text-decoration:underline}
+  .shown{margin-left:auto;font-size:13px;color:var(--faint)}
+
+  /* layout */
+  main{padding:18px 0 60px}
+  .stack{display:flex;flex-direction:column;gap:16px}
+  .two{display:grid;gap:16px;grid-template-columns:1fr;align-items:start}
+  @media(min-width:1000px){.two{grid-template-columns:1fr 1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .phead{display:flex;flex-wrap:wrap;gap:10px 12px;justify-content:space-between;align-items:flex-start;padding:15px 18px 0}
+  .phead>div:first-child{flex:1 1 220px;min-width:0}
+  .phead h2{margin:0;font-size:15.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .vn{width:20px;height:20px;border-radius:6px;background:var(--plum);color:#fff;
+    font-size:11.5px;font-weight:700;display:inline-grid;place-items:center;flex:0 0 auto}
+  .hint{margin:4px 0 0;font-size:12.5px;color:var(--faint);max-width:60ch}
+  .body{padding:14px 18px 18px}
+  .body.pad{padding:26px 28px}
+  .body.flush{padding:12px 0 0}
+  .foot{margin:14px 0 0;font-size:12px;color:var(--faint);line-height:1.5}
+  .note{background:#fff;border:1px solid var(--line);border-left:3px solid var(--med);
+    border-radius:10px;padding:10px 14px;margin:0;font-size:12.5px;color:var(--muted)}
+
+  /* verdict */
+  .hero{border-radius:14px;border:1px solid;padding:20px 22px;display:grid;gap:16px}
+  @media(min-width:1000px){.hero{grid-template-columns:minmax(0,1fr) 320px}}
+  .verdict{margin:0;font-size:27px;font-weight:650;letter-spacing:-.02em;line-height:1.15}
+  .say{margin:8px 0 0;font-size:15px;line-height:1.6;max-width:70ch}
+  .do{margin:10px 0 0;font-size:13.5px;font-weight:600}
+  .why{margin:0;padding:0;list-style:none;font-size:13px;line-height:1.55;color:var(--muted)}
+  .why li{padding-left:14px;position:relative;margin-bottom:6px}
+  .why li:before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.45}
+  .hero h3{margin:0 0 8px;font-size:12.5px;font-weight:600;color:var(--muted)}
+
+  /* numbers */
+  .stats{display:grid;gap:12px;grid-template-columns:repeat(2,1fr)}
+  @media(min-width:760px){.stats{grid-template-columns:repeat(4,1fr)}}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+  .stat.act{cursor:pointer}
+  .stat.act:hover{border-color:var(--plum)}
+  .stat.on{border-color:var(--plum);box-shadow:inset 0 0 0 1px var(--plum)}
+  .stat .lab{font-size:13px;color:var(--muted)}
+  .stat .v{display:block;font-size:32px;font-weight:600;letter-spacing:-.03em;line-height:1.1;margin-top:6px}
+  .stat .sub{font-size:12.5px;color:var(--faint);margin-top:3px;display:block}
+
+  /* segmented toggle */
+  .seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;flex:0 0 auto}
+  .segb{background:#fff;border:0;height:30px;padding:0 11px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+  .segb+.segb{border-left:1px solid var(--line2)}
+  .segb.on{background:var(--plum);color:#fff;font-weight:600}
+
+  /* visual 1: heat map */
+  .mgrid{display:grid;grid-template-columns:64px repeat(5,minmax(0,1fr));gap:5px}
+  .mh{font-size:11px;color:var(--faint);text-align:center;padding-bottom:2px;min-width:0}
+  .mh em{display:block;font-style:normal;font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mlab{font-size:11px;color:var(--faint);display:flex;flex-direction:column;justify-content:center;padding-right:6px}
+  .mlab em{font-style:normal;font-size:9.5px;line-height:1.2}
+  .cell{position:relative;height:54px;border:1px solid var(--line);border-radius:9px;background:#FAF9FD;
+    display:grid;place-items:center;padding:0;transition:transform .08s}
+  .cell .ct{font-size:16px;font-weight:650;color:var(--faint)}
+  .cell .sc{position:absolute;top:4px;right:6px;font-size:9.5px;color:var(--faint);opacity:.7}
+  .cell.has{border-color:transparent}
+  .cell.has .ct,.cell.has .sc{color:#fff}
+  .cell.has .sc{opacity:.8}
+  .cell.crit.has{background:var(--crit)}
+  .cell.high.has{background:var(--high)}
+  .cell.med.has{background:var(--med)}
+  .cell.low.has{background:var(--low)}
+  .cell.crit:not(.has){background:#FCF4F6}
+  .cell.high:not(.has){background:#FDF9F4}
+  .cell.med:not(.has){background:#FDFBF3}
+  .cell.low:not(.has){background:#F5FBF8}
+  .cell.has:hover{transform:scale(1.05)}
+  .cell.on{box-shadow:0 0 0 2px var(--plum);border-color:var(--plum)}
+  .mfoot{font-size:11px;color:var(--faint);text-align:center;margin-top:4px}
+  .mkey{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;font-size:12px;color:var(--muted)}
+  .mkey i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px}
+  .mkey .warn{color:var(--med)}
+
+  /* visual 2: donut */
+  .dwrap{display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+  .donut{width:168px;height:168px;flex:0 0 auto}
+  .donut .dv{font-size:30px;font-weight:600;fill:var(--ink)}
+  .donut .dl{font-size:11px;fill:var(--faint)}
+  .legendlist{flex:1 1 200px;min-width:0}
+  .lrow{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;border-radius:8px;
+    padding:6px 8px;font-size:13.5px;text-align:left;color:var(--ink)}
+  .lrow i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+  .lrow .ln{flex:1 1 auto}
+  .lrow .lv{font-weight:600}
+  .lrow .lp{width:44px;text-align:right;color:var(--faint);font-size:12.5px}
+  button.lrow:hover{background:var(--plum-tint)}
+  button.lrow.on{background:var(--plum-tint);font-weight:600}
+
+  /* visual 3: bars */
+  .rows{display:flex;flex-direction:column;gap:10px}
+  .row{display:grid;grid-template-columns:minmax(84px,132px) minmax(0,1fr) 40px;gap:10px;align-items:center;
+    font-size:13.5px;background:none;border:0;padding:2px 0;text-align:left;color:var(--ink);width:100%}
+  .row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .track{height:13px;border-radius:7px;background:#F1EFF7;overflow:hidden;display:flex}
+  .track span{display:block;height:100%}
+  .row .cnt{text-align:right;font-size:13px;color:var(--muted)}
+  .row.act{cursor:pointer}
+  .row.act:hover .name{color:var(--plum)}
+  .row.on .name{color:var(--plum);font-weight:600}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0 0;font-size:12px;color:var(--muted)}
+  .legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px}
+
+  /* visual 4: paired bars */
+  .pairs{display:flex;flex-direction:column;gap:13px}
+  .pair{border-bottom:1px solid var(--line);padding-bottom:11px}
+  .pair:last-child{border-bottom:0;padding-bottom:0}
+  .ph{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;margin-bottom:6px}
+  .ph .name{font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ph .cut{font-size:12.5px;font-weight:600;flex:0 0 auto}
+  .pr{display:grid;grid-template-columns:48px minmax(0,1fr) 34px;gap:8px;align-items:center;margin-top:4px}
+  .pl{font-size:11.5px;color:var(--faint)}
+  .pt{height:10px;border-radius:5px;background:#F1EFF7;overflow:hidden}
+  .pt span{display:block;height:100%;border-radius:5px}
+  .pv{font-size:12px;color:var(--muted);text-align:right}
+
+  /* visuals 5 and 6: columns */
+  .cols{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;align-items:end;
+    padding:6px 0 0;min-height:180px}
+  .col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;
+    background:none;border:0;padding:6px 2px;border-radius:10px;color:var(--ink)}
+  .col .cv{font-size:19px;font-weight:650;line-height:1}
+  .col .cb{width:100%;max-width:64px;border-radius:7px 7px 0 0;display:block}
+  .col .cl{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.3}
+  .col .cp{font-size:11px;color:var(--faint)}
+  button.col{cursor:pointer}
+  button.col:hover{background:var(--plum-tint)}
+  button.col.on{background:var(--plum-tint)}
+  button.col.on .cl{color:var(--plum);font-weight:600}
+
+  /* lists under the timeline */
+  .dl{display:grid;gap:16px;grid-template-columns:1fr;margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+  @media(min-width:620px){.dl{grid-template-columns:1fr 1fr}}
+  .dl h4{margin:0 0 6px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  .dl ul{margin:0;padding:0;list-style:none;font-size:13px}
+  .dl li{padding:7px 0;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:space-between;cursor:pointer}
+  .dl li:first-child{border-top:0}
+  .dl li:hover span:first-child{color:var(--plum)}
+  .dl li.rest{color:var(--faint);cursor:default;font-size:12px}
+  .dl .empty{padding:6px 0}
+
+  /* badges */
+  .b{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:1px 7px;font-size:11.5px;font-weight:600;white-space:nowrap}
+  .b-Critical{color:var(--crit);background:var(--critBg)}
+  .b-High{color:var(--high);background:var(--highBg)}
+  .b-Medium{color:var(--med);background:var(--medBg)}
+  .b-Low{color:var(--low);background:var(--lowBg)}
+  .b-none{color:var(--faint);background:#F1EFF7}
+  .tag{display:inline-flex;border-radius:6px;padding:1px 7px;font-size:11.5px;font-weight:600;
+    background:#F1EFF7;color:var(--muted);white-space:nowrap}
+  .tag.late{background:var(--critBg);color:var(--crit)}
+  .tag.soon{background:var(--medBg);color:var(--med)}
+  .bl{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+
+  /* priority */
+  ol.top{margin:0;padding:0;list-style:none;counter-reset:p}
+  ol.top li{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line);cursor:pointer}
+  ol.top li:first-child{border-top:0}
+  ol.top li:hover .t{color:var(--plum)}
+  ol.top .rank{counter-increment:p;flex:0 0 22px;font-size:13px;font-weight:600;color:var(--faint);padding-top:2px}
+  ol.top .rank:before{content:counter(p)}
+  ol.top .t{font-size:14.5px;font-weight:550;line-height:1.35}
+  ol.top .m{font-size:12.5px;color:var(--muted);margin-top:4px}
+
+  /* table */
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-weight:600;font-size:12.5px;color:var(--muted);padding:9px 12px;
+    border-bottom:1px solid var(--line);background:#FAF9FD;white-space:nowrap}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--plum-tint)}
+  td .rt{font-weight:550}
+  td .desc{color:var(--faint);font-size:12.5px;margin-top:2px;max-width:44ch}
+  .more{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 18px 18px;font-size:12.5px;color:var(--faint)}
+
+  /* detail */
+  .veil{position:fixed;inset:0;background:rgba(27,23,48,.45);display:flex;justify-content:flex-end;z-index:50}
+  .sheet{background:var(--card);width:min(580px,100%);height:100%;overflow-y:auto;padding:22px 24px 40px;position:relative}
+  .sheet .x{position:absolute;top:14px;right:18px;background:#fff;border:1px solid var(--line2);
+    border-radius:8px;width:32px;height:32px;font-size:16px;line-height:1}
+  .sheet h2{margin:0 42px 0 0;font-size:19px;font-weight:600;line-height:1.3}
+  .eyebrow{margin:0 0 6px;font-size:12.5px;color:var(--faint)}
+  .sdesc{margin:14px 0 0;font-size:14px;line-height:1.6;color:var(--muted)}
+  .sect{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
+  .sect h3{margin:0 0 8px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;font-size:13.5px}
+  .kv div span{display:block;font-size:12px;color:var(--faint)}
+  .kv .wide{grid-column:1/-1}
+  .scores{display:flex;gap:10px;flex-wrap:wrap}
+  .sc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;flex:1 1 160px}
+  .sc b{display:block;font-size:24px;font-weight:600;margin:2px 0 4px}
+  .sc small{color:var(--faint);font-size:12px}
+  .sc .sm{display:block;margin-top:6px;line-height:1.5}
+  .gaps{background:var(--medBg);border-radius:10px;padding:11px 13px;font-size:13px;color:#6B5200}
+  .gaps ul{margin:6px 0 0;padding-left:18px}
+
+  /* start */
+  .start{max-width:660px;margin:6vh auto 0}
+  .start h2{margin:0;font-size:21px;font-weight:600}
+  .start p{color:var(--muted);font-size:14px;line-height:1.65}
+  .startrow{margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .reading{font-size:13px;color:var(--plum);font-weight:600}
+  .quiet{font-size:13px;color:var(--faint)}
+  .needs{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+  .nh{margin:0 0 4px!important;font-weight:600;font-size:13.5px;color:var(--ink)!important}
+  .needs ul{color:var(--muted);font-size:13.5px;line-height:1.75;padding-left:18px;margin:6px 0 0}
+  .go{background:var(--plum);border:1px solid var(--plum);color:#fff;border-radius:9px;height:38px;
+    padding:0 16px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;cursor:pointer}
+  .go:hover{background:var(--plum-deep)}
+  .err{background:var(--critBg);border-radius:10px;padding:11px 14px;font-size:13.5px;color:var(--crit);margin-top:14px}
+
+  @media(max-width:560px){
+    .cell .sc{display:none}
+    .mgrid{grid-template-columns:52px repeat(5,minmax(0,1fr));gap:4px}
+  }
+
+  @media print{
+    body{background:#fff}
+    header,.bar,.more,.veil,.seg{display:none!important}
+    .card,.hero,.stat{break-inside:avoid;box-shadow:none;border-color:#DDD}
+    .two{grid-template-columns:1fr 1fr}
+    main{padding:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap hrow">
+    <div>
+      <h1>Risk dashboard</h1>
+      <p id="srcLine">No register loaded</p>
+    </div>
+    <div class="tools">
+      <label class="tool" for="fileInput">Upload register
+        <input id="fileInput" type="file" accept=".xlsx,.xlsm,.csv,.tsv" class="sr" />
+      </label>
+      <button class="tool" id="printBtn" type="button">Print / save PDF</button>
+      <button class="tool" id="clearBtn" type="button">Remove data</button>
+    </div>
+  </div>
+</header>
+
+<div class="bar" id="bar"><div class="wrap brow" id="brow"></div></div>
+
+<main class="wrap"><div id="view" class="stack"></div></main>
+<div id="sheetHost"></div>
+<script>
+"use strict";
+/* ============================================================
+   Risk dashboard - six visuals over your own risk register.
+   Reads .xlsx / .csv in the browser, scores every row, and draws:
+     1 heat map   2 severity mix   3 risk by category
+     4 control value   5 direction of travel   6 action timeline
+   Scoring bands, health tests and priority weights are unchanged
+   from the full Risk Command Center build.
+   ============================================================ */
+/* ---------- constants ---------- */
+const RATINGS = ["Critical", "High", "Medium", "Low"];
+const RATING_HEX = { Critical: "#CE1F35", High: "#DD6108", Medium: "#E8B00A", Low: "#0F9D6B" };
+const TRENDS = ["Increasing", "Stable", "Decreasing"];
+const TREND_HEX = { Increasing: "#CE1F35", Stable: "#6E6688", Decreasing: "#0F9D6B" };
+const P_LABEL = { 1: "Rare", 2: "Unlikely", 3: "Possible", 4: "Likely", 5: "Almost Certain" };
+const I_LABEL = { 1: "Insignificant", 2: "Minor", 3: "Moderate", 4: "Major", 5: "Severe" };
+const STATUSES = ["Open", "Monitoring", "Mitigating", "Accepted", "Escalated", "Closed"];
+const MIT_STATUSES = ["Not Started", "In Progress", "Completed", "Delayed", "Not Required"];
+const DUE_SOON_DAYS = 30;
+const REVIEW_CADENCE = { Critical: 30, High: 30, Medium: 90, Low: 180 };
+const PAGE_SIZE = 20;
+const ALL = "All";
+const PRIORITY_WEIGHTS = {
+  ratingCritical: 50, ratingHigh: 30, ratingMedium: 10, residualPerPoint: 2,
+  trendIncreasing: 15, overdue: 20, overdueLong: 10, escalation: 15,
+  controlIneffective: 12, controlPartial: 6, controlNotAssessed: 4,
+  mitigationDelayed: 12, mitigationNotStarted: 6, noMitigationPlan: 10,
+  dueSoon: 8, reviewOverdue: 5,
+};
+
+const HEALTH = {
+  critical: { criticalShare: 10, criticalShareWithOverdue: 5, overdueShare: 25, avgResidual: 15 },
+  attention: { criticalShare: 5, highCriticalShare: 35, overdueShare: 20, avgResidual: 12 },
+  watch: { highCriticalShare: 20, overdueShare: 10, increasingShare: 20, avgResidual: 8 },
+};
+/* ---------- small helpers ---------- */
+const MS_DAY = 86400000;
+const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = (v, d = 0) => Number(v).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (v, d = 0) => (Number.isFinite(v) ? num(v, d) + "%" : "--");
+const shareOf = (part, whole) => (whole ? (part / whole) * 100 : 0);
+const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+const round1 = (v) => Math.round(v * 10) / 10;
+const clip = (t, n) => (t.length <= n ? t : t.slice(0, n - 1).trimEnd() + "…");
+
+function today() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function dayDiff(from, to) {
+  const a = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const b = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((b - a) / MS_DAY);
+}
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+function parseDate(v) {
+  if (v == null || v === "") return null;
+  if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  if (typeof v === "number") {
+    const d = new Date(Date.UTC(1899, 11, 30) + v * MS_DAY);
+    return isNaN(d) ? null : new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  const t = String(v).trim();
+  if (!t) return null;
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = /^(\d{1,2})[\s\-\/]([A-Za-z]{3,})[\s\-\/](\d{2,4})$/.exec(t);
+  if (m) {
+    const mo = MONTHS.indexOf(m[2].slice(0, 3).toLowerCase());
+    if (mo >= 0) return new Date(+(m[3].length === 2 ? "20" + m[3] : m[3]), mo, +m[1]);
+  }
+  m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/.exec(t);
+  if (m) {
+    const y = +(m[3].length === 2 ? "20" + m[3] : m[3]);
+    return +m[2] <= 12 ? new Date(y, +m[2] - 1, +m[1]) : new Date(y, +m[1] - 1, +m[2]);
+  }
+  const d = new Date(t);
+  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function fmtDate(d) {
+  return d ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "--";
+}
+function dueText(d, closed) {
+  if (!d) return "No due date";
+  if (closed) return fmtDate(d);
+  const n = dayDiff(today(), d);
+  if (n < 0) return "Overdue " + Math.abs(n) + (Math.abs(n) === 1 ? " day" : " days");
+  if (n === 0) return "Due today";
+  return "Due in " + n + (n === 1 ? " day" : " days");
+}
+function ratingFromScore(s) {
+  if (s == null || !Number.isFinite(s)) return null;
+  if (s >= 15) return "Critical";
+  if (s >= 10) return "High";
+  if (s >= 5) return "Medium";
+  if (s >= 1) return "Low";
+  return null;
+}
+
+/* ---------- value coercion (mirrors src/data/columnMap.ts) ---------- */
+const key = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const P_WORDS = { rare: 1, verylow: 1, unlikely: 2, low: 2, possible: 3, moderate: 3, medium: 3, likely: 4, high: 4, probable: 4, almostcertain: 5, certain: 5, veryhigh: 5, highest: 5 };
+const I_WORDS = { insignificant: 1, negligible: 1, verylow: 1, minor: 2, low: 2, moderate: 3, medium: 3, major: 4, high: 4, significant: 4, severe: 5, critical: 5, catastrophic: 5, extreme: 5, highest: 5 };
+function toScale(v, dim) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number" && Number.isFinite(v)) { const r = Math.round(v); return r >= 1 && r <= 5 ? r : null; }
+  const raw = String(v).trim();
+  const lead = /^([1-5])(?!\d)/.exec(raw);
+  if (lead) return +lead[1];
+  const words = dim === "p" ? P_WORDS : I_WORDS;
+  const k = key(raw);
+  if (k in words) return words[k];
+  const n2 = Number(raw);
+  return Number.isFinite(n2) && n2 >= 1 && n2 <= 5 ? Math.round(n2) : null;
+}
+function toStatus(v) {
+  const k = key(v); if (!k) return "Not Set";
+  if (/closed|resolved|complete/.test(k)) return "Closed";
+  if (/escalat/.test(k)) return "Escalated";
+  if (/mitigat|treat/.test(k)) return "Mitigating";
+  if (/monitor|watch/.test(k)) return "Monitoring";
+  if (/accept|tolerat/.test(k)) return "Accepted";
+  if (/open|active|new/.test(k)) return "Open";
+  return "Not Set";
+}
+function toTrend(v) {
+  const k = key(v); if (!k) return "Not Set";
+  if (/increas|worsen|deteriorat|up$/.test(k)) return "Increasing";
+  if (/decreas|improv|reduc|down$/.test(k)) return "Decreasing";
+  if (/stable|flat|unchanged|static/.test(k)) return "Stable";
+  return "Not Set";
+}
+function toControl(v) {
+  const k = key(v); if (!k) return "Not Assessed";
+  if (/partial|some|improvement/.test(k)) return "Partially Effective";
+  if (/ineffective|weak|unsatisfactory|none/.test(k)) return "Ineffective";
+  if (/effective|satisfactory|strong|adequate/.test(k)) return "Effective";
+  return "Not Assessed";
+}
+function toMitigation(v) {
+  const k = key(v); if (!k) return "Not Set";
+  if (/notrequired|notapplicable|^na$/.test(k)) return "Not Required";
+  if (/notstarted|planned/.test(k)) return "Not Started";
+  if (/inprogress|ongoing|progress|started/.test(k)) return "In Progress";
+  if (/complete|done|implemented/.test(k)) return "Completed";
+  if (/delay|behind|blocked|overdue/.test(k)) return "Delayed";
+  return "Not Set";
+}
+const toBool = (v) => /^(yes|y|true|1|required)$/.test(key(v));
+const txt = (v) => String(v == null ? "" : v).trim().replace(/\s+/g, " ");
+
+/* ---------- normalise one row ---------- */
+function normalise(r, index) {
+  const issues = [];
+  const p = toScale(r.probability, "p"), i = toScale(r.impact, "i");
+  const rp = toScale(r.residualProbability, "p"), ri = toScale(r.residualImpact, "i");
+  const inherentScore = p != null && i != null ? p * i : null;
+  const residualScore = rp != null && ri != null ? rp * ri : inherentScore;
+  const inherentRating = ratingFromScore(inherentScore);
+  const residualRating = ratingFromScore(residualScore);
+
+  if (inherentScore == null) issues.push("No usable probability or impact, so the risk cannot be scored");
+  if (p == null) issues.push("Probability missing");
+  if (i == null) issues.push("Impact missing");
+  if (inherentScore != null && residualScore != null && residualScore > inherentScore)
+    issues.push("Residual score is higher than inherent score - re-check the assessment");
+
+  const owner = txt(r.owner); if (!owner) issues.push("No risk owner");
+  const category = txt(r.category); if (!category) issues.push("No risk category");
+
+  const status = toStatus(r.status);
+  const isClosed = status === "Closed";
+  const mitDue = parseDate(r.mitigationDueDate);
+  const target = parseDate(r.targetResolutionDate);
+  const dueDate = mitDue || target;
+  if (!dueDate && !isClosed) issues.push("No mitigation or target resolution date");
+
+  const daysUntilDue = dueDate ? dayDiff(today(), dueDate) : null;
+  const isOverdue = !isClosed && daysUntilDue != null && daysUntilDue < 0;
+  const isDueSoon = !isClosed && daysUntilDue != null && daysUntilDue >= 0 && daysUntilDue <= DUE_SOON_DAYS;
+  const mitStatus = toMitigation(r.mitigationStatus);
+  const plan = txt(r.mitigationPlan);
+  const ctrl = toControl(r.controlEffectiveness);
+  const lastReview = parseDate(r.lastReviewDate);
+  const cadence = inherentRating ? REVIEW_CADENCE[inherentRating] : 180;
+
+  return {
+    rowNumber: index + 2,
+    id: txt(r.id) || "ROW-" + (index + 2),
+    title: txt(r.title) || "Untitled risk (row " + (index + 2) + ")",
+    description: txt(r.description),
+    riskType: txt(r.riskType) || "Risk",
+    category: category || "Uncategorised",
+    subCategory: txt(r.subCategory),
+    businessUnit: txt(r.businessUnit) || "Uncategorised",
+    department: txt(r.department),
+    owner: owner || "Unassigned",
+    manager: txt(r.manager),
+    dateIdentified: parseDate(r.dateIdentified),
+    targetResolutionDate: target,
+    status, probability: p, impact: i, inherentScore, inherentRating,
+    controls: txt(r.controls), controlEffectiveness: ctrl,
+    residualProbability: rp, residualImpact: ri, residualScore, residualRating,
+    mitigationPlan: plan,
+    mitigationOwner: txt(r.mitigationOwner) || owner || "Unassigned",
+    mitigationDueDate: mitDue, mitigationStatus: mitStatus,
+    trend: toTrend(r.trend),
+    lastReviewDate: lastReview, nextReviewDate: parseDate(r.nextReviewDate),
+    escalationRequired: toBool(r.escalationRequired),
+    escalationLevel: txt(r.escalationLevel),
+    comments: txt(r.comments), dataSet: txt(r.dataSet), lastUpdated: parseDate(r.lastUpdated),
+    isClosed, dueDate, daysUntilDue,
+    daysOverdue: isOverdue ? Math.abs(daysUntilDue) : null,
+    isOverdue, isDueSoon,
+    hasMitigationPlan: plan.length > 0 || mitStatus === "Not Required",
+    reviewOverdue: !isClosed && !!lastReview && dayDiff(lastReview, today()) > cadence,
+    dataIssues: issues,
+  };
+}
+/* ---------- priority + health ---------- */
+function scorePriority(r) {
+  let s = 0; const why = [];
+  if (r.inherentRating === "Critical") { s += PRIORITY_WEIGHTS.ratingCritical; why.push("Critical inherent rating"); }
+  else if (r.inherentRating === "High") { s += PRIORITY_WEIGHTS.ratingHigh; why.push("High inherent rating"); }
+  else if (r.inherentRating === "Medium") s += PRIORITY_WEIGHTS.ratingMedium;
+  if (r.residualScore != null) {
+    s += r.residualScore * PRIORITY_WEIGHTS.residualPerPoint;
+    if (r.residualRating === "Critical" || r.residualRating === "High")
+      why.push("Residual risk still " + r.residualRating.toLowerCase());
+  }
+  if (r.trend === "Increasing") { s += PRIORITY_WEIGHTS.trendIncreasing; why.push("Trend increasing"); }
+  if (r.isOverdue) {
+    s += PRIORITY_WEIGHTS.overdue; why.push("Mitigation overdue by " + r.daysOverdue + " days");
+    if (r.daysOverdue > 30) s += PRIORITY_WEIGHTS.overdueLong;
+  } else if (r.isDueSoon) { s += PRIORITY_WEIGHTS.dueSoon; why.push("Due within " + DUE_SOON_DAYS + " days"); }
+  if (r.escalationRequired) {
+    s += PRIORITY_WEIGHTS.escalation;
+    why.push(r.escalationLevel ? "Escalation flagged (" + r.escalationLevel + ")" : "Escalation flagged");
+  }
+  if (r.controlEffectiveness === "Ineffective") { s += PRIORITY_WEIGHTS.controlIneffective; why.push("Controls ineffective"); }
+  else if (r.controlEffectiveness === "Partially Effective") s += PRIORITY_WEIGHTS.controlPartial;
+  else if (r.controlEffectiveness === "Not Assessed") { s += PRIORITY_WEIGHTS.controlNotAssessed; why.push("Control effectiveness not assessed"); }
+  if (r.mitigationStatus === "Delayed") { s += PRIORITY_WEIGHTS.mitigationDelayed; why.push("Mitigation delayed"); }
+  else if (r.mitigationStatus === "Not Started") { s += PRIORITY_WEIGHTS.mitigationNotStarted; why.push("Mitigation not started"); }
+  if (!r.hasMitigationPlan) { s += PRIORITY_WEIGHTS.noMitigationPlan; why.push("No mitigation plan recorded"); }
+  if (r.reviewOverdue) { s += PRIORITY_WEIGHTS.reviewOverdue; why.push("Review overdue"); }
+  if (r.isClosed) s = 0;
+  return { risk: r, score: Math.round(s), reasons: why };
+}
+
+function assessHealth(m) {
+  if (!m.total) return { status: "Healthy", reasons: ["No risks in the current selection."] };
+  const t = HEALTH, out = [];
+  const push = (c) => out.push(c);
+  const crit = [];
+  if (m.criticalPct > t.critical.criticalShare)
+    crit.push(pct(m.criticalPct, 1) + " of risks are Critical (above " + t.critical.criticalShare + "%).");
+  if (m.criticalPct > t.critical.criticalShareWithOverdue && m.overduePct > t.critical.overdueShare)
+    crit.push("Critical risks present and " + pct(m.overduePct, 1) + " of active risks are overdue (above " + t.critical.overdueShare + "%).");
+  if (m.avgResidual >= t.critical.avgResidual)
+    crit.push("Average residual score is " + round1(m.avgResidual) + ", in the Critical band (" + t.critical.avgResidual + "+).");
+  if (crit.length) return { status: "Critical", reasons: crit };
+
+  const att = [];
+  if (m.criticalPct > t.attention.criticalShare)
+    att.push(pct(m.criticalPct, 1) + " of risks are Critical (above " + t.attention.criticalShare + "%).");
+  if (m.highCriticalPct > t.attention.highCriticalShare)
+    att.push(pct(m.highCriticalPct, 1) + " of risks are High or Critical (above " + t.attention.highCriticalShare + "%).");
+  if (m.overduePct > t.attention.overdueShare)
+    att.push(pct(m.overduePct, 1) + " of active risks are overdue (above " + t.attention.overdueShare + "%).");
+  if (m.avgResidual >= t.attention.avgResidual)
+    att.push("Average residual score is " + round1(m.avgResidual) + ", in the High band (" + t.attention.avgResidual + "+).");
+  if (att.length) return { status: "Attention Required", reasons: att };
+
+  const w = [];
+  if (m.highCriticalPct > t.watch.highCriticalShare)
+    w.push(pct(m.highCriticalPct, 1) + " of risks are High or Critical (above " + t.watch.highCriticalShare + "%).");
+  if (m.overduePct > t.watch.overdueShare)
+    w.push(pct(m.overduePct, 1) + " of active risks are overdue (above " + t.watch.overdueShare + "%).");
+  if (m.increasingPct > t.watch.increasingShare)
+    w.push(pct(m.increasingPct, 1) + " of risks are trending upwards (above " + t.watch.increasingShare + "%).");
+  if (m.avgResidual >= t.watch.avgResidual)
+    w.push("Average residual score is " + round1(m.avgResidual) + ", in the Medium band (" + t.watch.avgResidual + "+).");
+  if (w.length) return { status: "Watch", reasons: w };
+  void push;
+  return {
+    status: "Healthy",
+    reasons: [
+      "Critical share " + pct(m.criticalPct, 1) + ", High+Critical " + pct(m.highCriticalPct, 1) + ", overdue " + pct(m.overduePct, 1) + " - all inside tolerance.",
+      "Average residual score " + round1(m.avgResidual) + " sits in the Low to Medium band.",
+    ],
+  };
+}
+/* ---------- analytics engine ---------- */
+const isOpenMitigation = (r) => !r.isClosed && ["Not Started", "In Progress", "Delayed"].includes(r.mitigationStatus);
+const countRating = (rs, x) => rs.filter((r) => r.inherentRating === x).length;
+
+function groupBy(risks, pick) {
+  const map = new Map();
+  risks.forEach((r) => {
+    const k = pick(r) || "Uncategorised";
+    if (map.has(k)) map.get(k).push(r); else map.set(k, [r]);
+  });
+  return [...map.entries()].map(([name, items]) => {
+    const inh = items.map((r) => r.inherentScore).filter((v) => v != null);
+    const res = items.map((r) => r.residualScore).filter((v) => v != null);
+    return {
+      name, total: items.length, items,
+      critical: countRating(items, "Critical"), high: countRating(items, "High"),
+      medium: countRating(items, "Medium"), low: countRating(items, "Low"),
+      avgInherent: round1(avg(inh)), avgResidual: round1(avg(res)),
+      overdue: items.filter((r) => r.isOverdue).length,
+      escalations: items.filter((r) => r.escalationRequired && !r.isClosed).length,
+      residualExposure: res.reduce((a, b) => a + b, 0),
+    };
+  }).sort((a, b) => b.total - a.total || b.residualExposure - a.residualExposure);
+}
+
+function withOthers(groups, limit) {
+  if (groups.length <= limit) return groups;
+  const top = groups.slice(0, limit), rest = groups.slice(limit);
+  const sum = (f) => rest.reduce((a, g) => a + f(g), 0);
+  return top.concat([{
+    name: "Others", total: sum((g) => g.total), critical: sum((g) => g.critical),
+    high: sum((g) => g.high), medium: sum((g) => g.medium), low: sum((g) => g.low),
+    avgInherent: round1(avg(rest.map((g) => g.avgInherent))),
+    avgResidual: round1(avg(rest.map((g) => g.avgResidual))),
+    overdue: sum((g) => g.overdue), escalations: sum((g) => g.escalations),
+    residualExposure: sum((g) => g.residualExposure), items: [],
+  }]);
+}
+
+function buildMatrix(risks, basis) {
+  const cells = [];
+  for (let p = 5; p >= 1; p--) for (let i = 1; i <= 5; i++) {
+    const hits = risks.filter((r) => (basis === "inherent" ? r.probability : r.residualProbability) === p &&
+      (basis === "inherent" ? r.impact : r.residualImpact) === i);
+    cells.push({ probability: p, impact: i, score: p * i, rating: ratingFromScore(p * i), count: hits.length });
+  }
+  return cells;
+}
+
+function computeMetrics(risks, totalUnfiltered) {
+  const total = risks.length;
+  const active = risks.filter((r) => !r.isClosed);
+  const critical = countRating(risks, "Critical"), high = countRating(risks, "High");
+  const medium = countRating(risks, "Medium"), low = countRating(risks, "Low");
+  const inh = risks.map((r) => r.inherentScore).filter((v) => v != null);
+  const res = risks.map((r) => r.residualScore).filter((v) => v != null);
+  const avgInherent = avg(inh), avgResidual = avg(res);
+  const relevant = risks.filter((r) => r.mitigationStatus !== "Not Required");
+  const completed = risks.filter((r) => r.mitigationStatus === "Completed").length;
+  const overdue = risks.filter((r) => r.isOverdue).length;
+  const increasing = risks.filter((r) => r.trend === "Increasing").length;
+  return {
+    total, totalUnfiltered, active: active.length, closed: total - active.length,
+    critical, high, medium, low, unrated: total - critical - high - medium - low,
+    criticalPct: shareOf(critical, total), highCriticalPct: shareOf(critical + high, total),
+    overdue, overduePct: shareOf(overdue, active.length),
+    dueSoon: risks.filter((r) => r.isDueSoon).length,
+    escalations: risks.filter((r) => r.escalationRequired && !r.isClosed).length,
+    openMitigations: risks.filter(isOpenMitigation).length,
+    completedMitigations: completed, mitigationCompletionPct: shareOf(completed, relevant.length),
+    noMitigationPlan: active.filter((r) => !r.hasMitigationPlan).length,
+    ineffectiveControls: risks.filter((r) => r.controlEffectiveness === "Ineffective").length,
+    avgInherent, avgResidual,
+    riskReductionPct: avgInherent > 0 ? ((avgInherent - avgResidual) / avgInherent) * 100 : 0,
+    increasing, increasingPct: shareOf(increasing, total),
+    stable: risks.filter((r) => r.trend === "Stable").length,
+    decreasing: risks.filter((r) => r.trend === "Decreasing").length,
+    reviewOverdue: risks.filter((r) => r.reviewOverdue).length,
+  };
+}
+
+function buildSummary(m, status) {
+  if (!m.total) return "No risks match the current filters.";
+  const parts = [];
+  parts.push(m.active + " active " + (m.active === 1 ? "risk is" : "risks are") + " being monitored" +
+    (m.closed ? ", with " + m.closed + " closed" : "") + ". " + m.critical + " " +
+    (m.critical === 1 ? "is" : "are") + " Critical and " + m.high + " " + (m.high === 1 ? "is" : "are") + " High.");
+  if (m.overdue > 0) parts.push(m.overdue + " " + (m.overdue === 1 ? "risk needs" : "risks need") +
+    " immediate attention due to overdue mitigation activity" +
+    (m.escalations ? ", and " + m.escalations + " are flagged for escalation." : "."));
+  else if (m.escalations) parts.push("No mitigation is overdue, though " + m.escalations + " risks are flagged for escalation.");
+  else parts.push("No mitigation activity is overdue.");
+  parts.push("Overall risk health: " + status + ".");
+  return parts.join(" ");
+}
+
+function computeAnalytics(risks, totalUnfiltered) {
+  const metrics = computeMetrics(risks, totalUnfiltered);
+  const health = assessHealth(metrics);
+  const byCategory = groupBy(risks, (r) => r.category);
+  const ownerThreshold = Math.max(risks.length * 0.15, 3);
+  return {
+    metrics, health,
+    summary: buildSummary(metrics, health.status),
+    ratingBreakdown: RATINGS.map((rating) => {
+      const count = countRating(risks, rating);
+      return { rating, count, percentage: shareOf(count, risks.length) };
+    }),
+    trendBreakdown: TRENDS.map((trend) => {
+      const count = risks.filter((r) => r.trend === trend).length;
+      return { trend, count, percentage: shareOf(count, risks.length) };
+    }),
+    matrix: { inherent: buildMatrix(risks, "inherent"), residual: buildMatrix(risks, "residual") },
+    byCategory,
+    byBusinessUnit: withOthers(groupBy(risks, (r) => r.businessUnit), 8),
+    byOwner: groupBy(risks, (r) => r.owner).map((g) =>
+      Object.assign({}, g, { concentrated: g.total > ownerThreshold || g.critical >= 3 })),
+    inherentVsResidual: byCategory.slice(0, 8)
+      .map((g) => ({ name: g.name, inherent: g.avgInherent, residual: g.avgResidual, total: g.total }))
+      .sort((a, b) => b.inherent - a.inherent),
+    priorityRisks: risks.filter((r) => !r.isClosed).map(scorePriority)
+      .sort((a, b) => b.score - a.score || (b.risk.residualScore || 0) - (a.risk.residualScore || 0)).slice(0, 8),
+    overdueRisks: risks.filter((r) => r.isOverdue).sort((a, b) => b.daysOverdue - a.daysOverdue),
+    dueSoonRisks: risks.filter((r) => r.isDueSoon).sort((a, b) => a.daysUntilDue - b.daysUntilDue),
+  };
+}
+
+/* ---------- saved register (artifact persistent storage) ---------- */
+const STORE_KEY = "risk-register:current";
+const hasStore = typeof window !== "undefined" && window.storage && typeof window.storage.get === "function";
+
+async function saveRegister(payload) {
+  if (!hasStore) return;
+  try {
+    await window.storage.set(STORE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.error("[risk-dashboard] could not save the register:", err);
+  }
+}
+
+async function loadSavedRegister() {
+  if (!hasStore) return null;
+  try {
+    const result = await window.storage.get(STORE_KEY);
+    return result && result.value ? JSON.parse(result.value) : null;
+  } catch (err) {
+    // A missing key throws rather than returning null - that is simply "nothing saved yet".
+    return null;
+  }
+}
+
+async function clearSavedRegister() {
+  if (!hasStore) return;
+  try {
+    await window.storage.delete(STORE_KEY);
+  } catch (err) {
+    console.error("[risk-dashboard] could not clear the saved register:", err);
+  }
+}
+/* ============================================================
+   Excel reading - self contained, no external library.
+   .xlsx is a ZIP of XML: we read the zip directory, inflate the
+   entries with the browser's native DecompressionStream, then
+   parse the sheet XML. Values are taken exactly as stored in the
+   workbook, including dates and shared strings.
+   ============================================================ */
+const HEADER_MAP = {
+  id: ["riskid", "id", "ref", "reference", "riskref", "key", "issuekey"],
+  title: ["risktitle", "title", "risk", "riskname", "topic", "summary"],
+  description: ["riskdescription", "description", "details", "riskdetail"],
+  riskType: ["risktype", "type", "riad", "riadcheck", "recordtype"],
+  category: ["riskcategory", "category", "theme"],
+  subCategory: ["subcategory", "risksubcategory", "subcat"],
+  businessUnit: ["businessunit", "bu", "division", "entity", "segment"],
+  department: ["department", "dept", "function", "team"],
+  owner: ["riskowner", "owner", "assignee", "responsible"],
+  manager: ["riskmanager", "manager", "reporter", "raisedby"],
+  dateIdentified: ["dateidentified", "identifieddate", "raiseddate", "datecreated", "created"],
+  targetResolutionDate: ["targetresolutiondate", "targetdate", "resolutiondate", "targetcompletiondate", "closuredate"],
+  status: ["status", "riskstatus", "currentstatus"],
+  probability: ["probability", "likelihood", "inherentprobability"],
+  impact: ["impact", "severity", "consequence", "inherentimpact"],
+  inherentScore: ["inherentriskscore", "inherentscore", "riskscore", "grossriskscore"],
+  inherentRating: ["riskrating", "inherentriskrating", "rating", "criticality", "riskseverity", "risklevel"],
+  controls: ["currentcontrols", "controls", "existingcontrols", "keycontrols"],
+  controlEffectiveness: ["controleffectiveness", "controlstrength", "levelofcontrol", "effectiveness"],
+  residualProbability: ["residualprobability", "residuallikelihood", "netprobability"],
+  residualImpact: ["residualimpact", "netimpact", "residualseverity"],
+  residualScore: ["residualriskscore", "residualscore", "netriskscore"],
+  residualRating: ["residualriskrating", "residualrating", "netriskrating"],
+  mitigationPlan: ["mitigationplan", "mitigation", "actionplan", "mitigationactionplan", "treatmentplan"],
+  mitigationOwner: ["mitigationowner", "actionowner", "treatmentowner"],
+  mitigationDueDate: ["mitigationduedate", "duedate", "actionduedate", "mitigationdate"],
+  mitigationStatus: ["mitigationstatus", "actionstatus", "treatmentstatus"],
+  trend: ["risktrend", "trend", "direction", "movement"],
+  lastReviewDate: ["lastreviewdate", "lastreviewed", "lastreview"],
+  nextReviewDate: ["nextreviewdate", "nextreview", "reviewdue"],
+  escalationRequired: ["escalationrequired", "escalation", "escalate", "requiresescalation"],
+  escalationLevel: ["escalationlevel", "escalationforum", "level"],
+  comments: ["comments", "comment", "notes", "remarks"],
+  dataSet: ["dataset", "datatype", "recordsource"],
+  lastUpdated: ["lastupdated", "updated", "lastmodified", "modified"],
+};
+const LOOKUP = (() => {
+  const m = new Map();
+  Object.keys(HEADER_MAP).forEach((f) => HEADER_MAP[f].forEach((a) => { if (!m.has(a)) m.set(a, f); }));
+  return m;
+})();
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream === "undefined") {
+    throw new Error("This browser cannot open .xlsx files. Use a recent Chrome, Edge, Firefox or Safari, or save the register as CSV.");
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/** Reads the ZIP central directory and returns name -> bytes. */
+async function unzip(buffer) {
+  const u8 = new Uint8Array(buffer);
+  const dv = new DataView(buffer);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65558); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("That file is not a valid .xlsx workbook.");
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const decoder = new TextDecoder();
+  const found = [];
+  for (let n = 0; n < count; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    const compSize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const localOff = dv.getUint32(p + 42, true);
+    const name = decoder.decode(u8.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + commentLen;
+    const lNameLen = dv.getUint16(localOff + 26, true);
+    const lExtraLen = dv.getUint16(localOff + 28, true);
+    const start = localOff + 30 + lNameLen + lExtraLen;
+    found.push({ name, method, data: u8.subarray(start, start + compSize) });
+  }
+  const out = new Map();
+  for (const f of found) {
+    if (f.method === 0) out.set(f.name, f.data);
+    else if (f.method === 8) out.set(f.name, await inflateRaw(f.data));
+  }
+  return out;
+}
+
+const XML = (text) => new DOMParser().parseFromString(text, "application/xml");
+const tags = (node, name) => (node ? Array.from(node.getElementsByTagName(name)) : []);
+
+function columnIndex(ref) {
+  let n = 0;
+  for (const ch of ref) {
+    const c = ch.charCodeAt(0);
+    if (c >= 65 && c <= 90) n = n * 26 + (c - 64);
+    else if (c >= 97 && c <= 122) n = n * 26 + (c - 96);
+    else break;
+  }
+  return n - 1;
+}
+
+/** Style indexes whose number format is a date, so serial numbers become real dates. */
+function dateStyleIndexes(stylesXml) {
+  const set = new Set();
+  if (!stylesXml) return set;
+  const doc = XML(stylesXml);
+  const custom = new Map();
+  tags(doc, "numFmt").forEach((f) => custom.set(+f.getAttribute("numFmtId"), f.getAttribute("formatCode") || ""));
+  const builtin = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+    45, 46, 47, 50, 51, 52, 53, 54, 55, 56, 57, 58]);
+  const cellXfs = doc.getElementsByTagName("cellXfs")[0];
+  if (!cellXfs) return set;
+  tags(cellXfs, "xf").forEach((xf, index) => {
+    const id = +(xf.getAttribute("numFmtId") || 0);
+    let isDate = builtin.has(id);
+    if (!isDate && custom.has(id)) {
+      const code = custom.get(id).replace(/\[[^\]]*\]/g, "").replace(/"[^"]*"/g, "");
+      isDate = /[ymd]/i.test(code);
+    }
+    if (isDate) set.add(index);
+  });
+  return set;
+}
+
+function sharedStringList(xml) {
+  if (!xml) return [];
+  return tags(XML(xml), "si").map((si) => {
+    const runs = tags(si, "t");
+    return runs.map((t) => t.textContent).join("");
+  });
+}
+
+function serialToDate(n) {
+  const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/** One worksheet -> array of rows, each an array of cell values in column order. */
+function parseSheetXml(xml, shared, dateStyles) {
+  const doc = XML(xml);
+  const rows = [];
+  tags(doc, "row").forEach((rowEl) => {
+    const cells = [];
+    tags(rowEl, "c").forEach((c) => {
+      const ref = c.getAttribute("r") || "";
+      const index = ref ? columnIndex(ref) : cells.length;
+      const type = c.getAttribute("t");
+      const styleIndex = c.getAttribute("s");
+      let value = "";
+      if (type === "inlineStr") {
+        value = tags(c, "t").map((t) => t.textContent).join("");
+      } else {
+        const vEl = c.getElementsByTagName("v")[0];
+        const raw = vEl ? vEl.textContent : null;
+        if (raw === null) value = "";
+        else if (type === "s") value = shared[+raw] !== undefined ? shared[+raw] : "";
+        else if (type === "b") value = raw === "1" ? "Yes" : "No";
+        else if (type === "str" || type === "e" || type === "d") value = raw;
+        else {
+          const n = Number(raw);
+          if (!Number.isFinite(n)) value = raw;
+          else if (styleIndex !== null && dateStyles.has(+styleIndex) && n > 1) value = serialToDate(n);
+          else value = n;
+        }
+      }
+      cells[index >= 0 ? index : cells.length] = value;
+    });
+    rows.push(cells);
+  });
+  return rows;
+}
+
+const headerScore = (row) =>
+  (row || []).filter((cell) => typeof cell === "string" && LOOKUP.has(key(cell))).length;
+
+/** Turns rows-of-cells into field-keyed objects using the best header row. */
+function rowsToRecords(rows) {
+  let headerAt = -1;
+  let best = 0;
+  rows.slice(0, 12).forEach((row, i) => {
+    const score = headerScore(row);
+    if (score > best) { best = score; headerAt = i; }
+  });
+  if (headerAt < 0) return { records: [], unmapped: [], matched: 0 };
+
+  const headers = rows[headerAt].map((h) => (h == null ? "" : String(h).trim()));
+  const fields = headers.map((h) => LOOKUP.get(key(h)) || null);
+  const unmapped = headers.filter((h, i) => h && !fields[i]);
+  const used = new Set();
+  const records = [];
+  rows.slice(headerAt + 1).forEach((row) => {
+    if (!row || row.every((c) => c === "" || c == null)) return;
+    const record = {};
+    fields.forEach((field, i) => {
+      if (!field) return;
+      if (used.has(field) && record[field]) return;
+      record[field] = row[i] === undefined ? "" : row[i];
+    });
+    if (txt(record.title) || txt(record.id)) records.push(record);
+  });
+  return { records, unmapped, matched: best };
+}
+
+async function parseXlsx(buffer) {
+  const files = await unzip(buffer);
+  const text = (name) => (files.has(name) ? new TextDecoder().decode(files.get(name)) : null);
+
+  const shared = sharedStringList(text("xl/sharedStrings.xml"));
+  const dateStyles = dateStyleIndexes(text("xl/styles.xml"));
+
+  // sheet name -> part path, via the workbook and its relationships
+  const wbXml = text("xl/workbook.xml");
+  const relsXml = text("xl/_rels/workbook.xml.rels");
+  const rels = new Map();
+  if (relsXml) {
+    tags(XML(relsXml), "Relationship").forEach((r) =>
+      rels.set(r.getAttribute("Id"), r.getAttribute("Target").replace(/^\/?xl\//, "").replace(/^\//, "")));
+  }
+  let sheets = [];
+  if (wbXml) {
+    sheets = tags(XML(wbXml), "sheet").map((sh, i) => {
+      const rid = sh.getAttribute("r:id") || sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+      const target = rels.get(rid) || "worksheets/sheet" + (i + 1) + ".xml";
+      return { name: sh.getAttribute("name") || "Sheet" + (i + 1), path: "xl/" + target };
+    });
+  }
+  if (!sheets.length) {
+    sheets = [...files.keys()].filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))
+      .map((n, i) => ({ name: "Sheet" + (i + 1), path: n }));
+  }
+  if (!sheets.length) throw new Error("The workbook contains no worksheets.");
+
+  // Prefer a sheet called "Risk Register"; otherwise the sheet whose headers match best.
+  let chosen = null;
+  for (const sheet of sheets) {
+    const xml = text(sheet.path);
+    if (!xml) continue;
+    const rows = parseSheetXml(xml, shared, dateStyles);
+    const parsed = rowsToRecords(rows);
+    const named = sheet.name.trim().toLowerCase() === "risk register";
+    const score = parsed.matched + (named ? 100 : 0) + (parsed.records.length ? 1 : 0);
+    if (!chosen || score > chosen.score) chosen = { score, sheet, parsed };
+    if (named && parsed.records.length) break;
+  }
+  if (!chosen || chosen.parsed.matched < 2) {
+    throw new Error("No sheet in that workbook looks like a risk register. It needs a header row with columns such as Risk Title, Probability and Impact.");
+  }
+  if (!chosen.parsed.records.length) throw new Error("The register sheet has headers but no data rows.");
+  return { records: chosen.parsed.records, sheetName: chosen.sheet.name, unmapped: chosen.parsed.unmapped };
+}
+
+/** CSV / TSV, quote-aware. */
+function parseDelimited(content, delimiter) {
+  const rows = [];
+  let row = [], value = "", quoted = false;
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (content[i + 1] === '"') { value += '"'; i++; } else quoted = false;
+      } else value += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === delimiter) { row.push(value); value = ""; }
+    else if (ch === "\n") { row.push(value); rows.push(row); row = []; value = ""; }
+    else if (ch !== "\r") value += ch;
+  }
+  if (value !== "" || row.length) { row.push(value); rows.push(row); }
+  const parsed = rowsToRecords(rows);
+  if (parsed.matched < 2) throw new Error("That file has no recognisable risk register headers.");
+  return { records: parsed.records, sheetName: "CSV", unmapped: parsed.unmapped };
+}
+
+async function readWorkbook(file) {
+  state.error = null;
+  state.reading = file.name;
+  const ls = document.getElementById("loadState");
+  if (ls) ls.innerHTML = "Reading " + esc(file.name) + "…";
+  if (!state.risks.length) renderEmpty();
+  try {
+    const name = file.name.toLowerCase();
+    const result = /\.(csv|tsv|txt)$/.test(name)
+      ? parseDelimited(await file.text(), name.endsWith(".tsv") ? "\t" : ",")
+      : await parseXlsx(await file.arrayBuffer());
+    state.reading = null;
+    loadRows(result.records, file.name, result.sheetName);
+    state.unmapped = result.unmapped;
+    state.restored = false;
+    render();
+    await saveRegister({
+      name: file.name,
+      sheetName: result.sheetName,
+      unmapped: result.unmapped,
+      records: result.records,
+      savedAt: Date.now(),
+    });
+  } catch (err) {
+    console.error("[risk-dashboard] upload failed:", err);
+    state.reading = null;
+    state.error = err && err.message ? err.message : "That file could not be read as a risk register.";
+    render();
+  }
+}
+/* ---------- state ---------- */
+const EMPTY_FILTERS = { search: "", rating: ALL, category: ALL, trend: ALL, overdueOnly: false, cell: null };
+const state = {
+  risks: [], source: "", sheetName: "", loadedAt: new Date(),
+  error: null, reading: null, restored: false, unmapped: [],
+  filters: Object.assign({}, EMPTY_FILTERS), basis: "inherent",
+  selectedId: null, showAll: false,
+};
+
+function loadRows(rows, sourceLabel, sheetName) {
+  const normalised = rows.map(normalise).filter((r) => r.title || r.id);
+  if (!normalised.length) throw new Error("The register has no usable rows.");
+  state.risks = normalised;
+  state.source = sourceLabel;
+  state.sheetName = sheetName || "Risk Register";
+  state.loadedAt = new Date();
+  state.error = null;
+  state.selectedId = null;
+  state.showAll = false;
+  state.filters = Object.assign({}, EMPTY_FILTERS);
+}
+
+function applyFilters(risks, f) {
+  const q = f.search.trim().toLowerCase();
+  return risks.filter((r) => {
+    if (f.rating !== ALL && r.inherentRating !== f.rating) return false;
+    if (f.category !== ALL && r.category !== f.category) return false;
+    if (f.trend !== ALL && r.trend !== f.trend) return false;
+    if (f.overdueOnly && !r.isOverdue) return false;
+    if (f.cell) {
+      const p = f.cell.basis === "inherent" ? r.probability : r.residualProbability;
+      const i = f.cell.basis === "inherent" ? r.impact : r.residualImpact;
+      if (p !== f.cell.p || i !== f.cell.i) return false;
+    }
+    if (!q) return true;
+    return [r.id, r.title, r.description, r.category, r.owner, r.businessUnit, r.mitigationPlan]
+      .some((v) => String(v || "").toLowerCase().includes(q));
+  });
+}
+
+/* ---------- shared bits ---------- */
+const HEALTH_TONE = {
+  Healthy: { fg: "var(--low)", bg: "var(--lowBg)", bd: "#BEE5D5", act: "Keep to the normal review cycle." },
+  Watch: { fg: "var(--med)", bg: "var(--medBg)", bd: "#EBD9A0", act: "Nothing urgent, but two or three measures are drifting." },
+  "Attention Required": { fg: "var(--high)", bg: "var(--highBg)", bd: "#F2D2AE", act: "Bring this to the next management meeting." },
+  Critical: { fg: "var(--crit)", bg: "var(--critBg)", bd: "#F3C0CB", act: "Escalate now and agree owners for the top risks." },
+};
+const badge = (rating, score) =>
+  '<span class="b b-' + (rating || "none") + '">' + (rating || "Unrated") +
+  (score != null ? ' <span class="num">' + score + "</span>" : "") + "</span>";
+const dueTag = (r) => {
+  if (r.isClosed) return '<span class="tag">Closed</span>';
+  if (!r.dueDate) return '<span class="tag">No date</span>';
+  if (r.isOverdue) return '<span class="tag late">' + r.daysOverdue + " days late</span>";
+  if (r.isDueSoon) return '<span class="tag soon">in ' + r.daysUntilDue + ' days</span>';
+  return '<span class="tag">' + fmtDate(r.dueDate) + "</span>";
+};
+
+/** A visual panel: numbered so the handover note can refer to it. */
+function panel(n, title, hint, body, extra) {
+  return '<section class="card" id="v' + n + '">' +
+    '<div class="phead"><div><h2><span class="vn">' + n + "</span>" + esc(title) + "</h2>" +
+    '<p class="hint">' + esc(hint) + "</p></div>" + (extra || "") + "</div>" +
+    '<div class="body">' + body + "</div></section>";
+}
+const plain = (title, hint, body, id) =>
+  '<section class="card"' + (id ? ' id="' + id + '"' : "") + '><div class="phead"><div><h2>' + esc(title) + "</h2>" +
+  (hint ? '<p class="hint">' + esc(hint) + "</p>" : "") + "</div></div>" +
+  '<div class="body">' + body + "</div></section>";
+
+/* ---------- chrome ---------- */
+function renderChrome(a, filtered) {
+  document.getElementById("srcLine").textContent = state.risks.length
+    ? esc(state.source) + " \u2014 " + num(state.risks.length) + " risks, read " +
+      state.loadedAt.toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })
+    : (state.error ? esc(state.error) : "No register loaded");
+
+  const f = state.filters;
+  const counts = {};
+  RATINGS.forEach((x) => { counts[x] = state.risks.filter((r) => r.inherentRating === x).length; });
+  const overdue = state.risks.filter((r) => r.isOverdue).length;
+  const chip = (label, on, act, n) =>
+    '<button class="chip' + (on ? " on" : "") + '" type="button" data-act="' + act + '">' + esc(label) +
+    (n != null ? ' <span class="n num">' + n + "</span>" : "") + "</button>";
+
+  const active = [];
+  if (f.category !== ALL) active.push(["Category: " + f.category, "category:" + ALL]);
+  if (f.trend !== ALL) active.push(["Trend: " + f.trend, "trend:" + ALL]);
+  if (f.cell) active.push([(f.cell.basis === "inherent" ? "Before" : "After") + " controls: P" + f.cell.p + " \u00d7 I" + f.cell.i, "cell:none"]);
+  const dirty = f.search || f.rating !== ALL || f.overdueOnly || active.length;
+
+  document.getElementById("brow").innerHTML =
+    '<input type="search" id="q" placeholder="Search risk, owner or category" value="' + esc(f.search) + '" />' +
+    chip("All", f.rating === ALL && !f.overdueOnly && !active.length, "reset") +
+    RATINGS.map((x) => chip(x, f.rating === x, "rating:" + x, counts[x])).join("") +
+    chip("Overdue only", f.overdueOnly, "overdue", overdue) +
+    active.map((x) => '<button class="chip on" type="button" data-act="' + x[1] + '">' + esc(x[0]) + " \u00d7</button>").join("") +
+    (dirty ? '<button class="clear" type="button" data-act="reset">Clear all</button>' : "") +
+    '<span class="shown num">' + num(filtered.length) + " of " + num(state.risks.length) + " shown</span>";
+}
+
+/* ---------- verdict + numbers ---------- */
+function viewHealth(a) {
+  const t = HEALTH_TONE[a.health.status];
+  return '<section class="hero" style="background:' + t.bg + ";border-color:" + t.bd + '">' +
+    '<div><p class="verdict" style="color:' + t.fg + '">' + esc(a.health.status) + "</p>" +
+    '<p class="say">' + esc(a.summary) + "</p>" +
+    '<p class="do">' + esc(t.act) + "</p></div>" +
+    '<div><h3>Why the verdict reads that way</h3><ul class="why">' +
+    a.health.reasons.map((r) => "<li>" + esc(r) + "</li>").join("") + "</ul></div></section>";
+}
+
+function viewStats(m, f) {
+  const tile = (label, value, sub, colour, act, on) =>
+    '<div class="stat' + (act ? " act" : "") + (on ? " on" : "") + '"' +
+    (act ? ' role="button" tabindex="0" data-act="' + act + '"' : "") + ">" +
+    '<span class="lab">' + esc(label) + "</span>" +
+    '<span class="v num" style="color:' + colour + '">' + value + "</span>" +
+    '<span class="sub">' + esc(sub) + "</span></div>";
+  return '<div class="stats">' +
+    tile("Risks in register", num(m.total), num(m.active) + " active, " + num(m.closed) + " closed", "var(--ink)", "reset", false) +
+    tile("Critical", num(m.critical), pct(m.criticalPct, 0) + " of the register", m.critical ? "var(--crit)" : "var(--ink)", "rating:Critical", f.rating === "Critical") +
+    tile("Overdue", num(m.overdue), m.overdue ? pct(m.overduePct, 0) + " of active risks" : "nothing past its date", m.overdue ? "var(--crit)" : "var(--low)", "overdue", f.overdueOnly) +
+    tile("Actions open", num(m.openMitigations), pct(m.mitigationCompletionPct, 0) + " of actions done", "var(--plum)", "", false) +
+    "</div>";
+}
+
+/* ---------- visual 1: heat map ---------- */
+function viewMatrix(a, f) {
+  const basis = state.basis;
+  const cells = a.matrix[basis];
+  const plotted = cells.reduce((s, c) => s + c.count, 0);
+  const missing = a.metrics.total - plotted;
+  const band = (s) => (s >= 15 ? "crit" : s >= 10 ? "high" : s >= 5 ? "med" : "low");
+
+  let grid = '<div class="mh"></div>' +
+    [1, 2, 3, 4, 5].map((i) => '<div class="mh">' + i + "<em>" + I_LABEL[i] + "</em></div>").join("");
+  for (let p = 5; p >= 1; p--) {
+    grid += '<div class="mlab">' + p + "<em>" + P_LABEL[p] + "</em></div>";
+    for (let i = 1; i <= 5; i++) {
+      const c = cells.find((x) => x.probability === p && x.impact === i);
+      const on = f.cell && f.cell.p === p && f.cell.i === i && f.cell.basis === basis;
+      grid += '<button class="cell ' + band(c.score) + (c.count ? " has" : "") + (on ? " on" : "") +
+        '" type="button" data-act="cell:' + p + ":" + i + '" title="Probability ' + p + " \u00d7 impact " + i +
+        " = " + c.score + ", " + c.rating + ", " + c.count + ' risk(s)">' +
+        '<span class="ct num">' + (c.count || "") + "</span>" +
+        '<span class="sc num">' + c.score + "</span></button>";
+    }
+  }
+  const toggle = '<div class="seg">' +
+    ["inherent", "residual"].map((bx) =>
+      '<button class="segb' + (basis === bx ? " on" : "") + '" type="button" data-act="basis:' + bx + '">' +
+      (bx === "inherent" ? "Before controls" : "After controls") + "</button>").join("") + "</div>";
+
+  const body = '<div class="mgrid">' + grid + "</div>" +
+    '<p class="mfoot">Impact across, probability up. The number in a square is how many risks sit there.</p>' +
+    '<div class="mkey">' +
+    RATINGS.map((r) => '<span><i style="background:' + RATING_HEX[r] + '"></i>' + r + "</span>").join("") +
+    (missing > 0 ? '<span class="warn">' + missing + " risk" + (missing === 1 ? "" : "s") + " not plotted, no score on the sheet</span>" : "") +
+    "</div>";
+  return panel(1, "Risk heat map", "Where each risk sits on probability against impact. Tap a square to see just those risks.", body, toggle);
+}
+
+/* ---------- visual 2: severity donut ---------- */
+function viewDonut(a, f) {
+  const m = a.metrics;
+  const parts = a.ratingBreakdown.filter((b) => b.count > 0);
+  const unrated = m.unrated;
+  const total = m.total || 1;
+  const R = 62, SW = 24, C = 2 * Math.PI * R;
+  let at = 0;
+  const arcs = parts.map((b) => {
+    const len = (b.count / total) * C;
+    const seg = '<circle cx="80" cy="80" r="' + R + '" fill="none" stroke="' + RATING_HEX[b.rating] +
+      '" stroke-width="' + SW + '" stroke-dasharray="' + (len - 1.5) + " " + (C - len + 1.5) +
+      '" stroke-dashoffset="' + -at + '" transform="rotate(-90 80 80)"></circle>';
+    at += len;
+    return seg;
+  }).join("");
+  const rest = unrated > 0
+    ? '<circle cx="80" cy="80" r="' + R + '" fill="none" stroke="#DED8EE" stroke-width="' + SW +
+      '" stroke-dasharray="' + ((unrated / total) * C - 1.5) + " " + (C - (unrated / total) * C + 1.5) +
+      '" stroke-dashoffset="' + -at + '" transform="rotate(-90 80 80)"></circle>'
+    : "";
+  const svg = '<svg viewBox="0 0 160 160" class="donut" role="img" aria-label="Split of risks by rating">' +
+    '<circle cx="80" cy="80" r="' + R + '" fill="none" stroke="#F1EFF7" stroke-width="' + SW + '"></circle>' +
+    arcs + rest +
+    '<text x="80" y="74" text-anchor="middle" class="dv">' + num(m.total) + "</text>" +
+    '<text x="80" y="94" text-anchor="middle" class="dl">risks</text></svg>';
+
+  const rows = a.ratingBreakdown.map((b) =>
+    '<button class="lrow' + (f.rating === b.rating ? " on" : "") + '" type="button" data-act="rating:' + b.rating + '">' +
+    '<i style="background:' + RATING_HEX[b.rating] + '"></i><span class="ln">' + b.rating + "</span>" +
+    '<span class="lv num">' + num(b.count) + '</span><span class="lp num">' + pct(b.percentage, 0) + "</span></button>").join("") +
+    (unrated ? '<div class="lrow"><i style="background:#DED8EE"></i><span class="ln">Not scored</span>' +
+      '<span class="lv num">' + num(unrated) + '</span><span class="lp num">' + pct(shareOf(unrated, total), 0) + "</span></div>" : "");
+
+  const body = '<div class="dwrap">' + svg + '<div class="legendlist">' + rows +
+    '<p class="foot">High and Critical together: <b>' + pct(m.highCriticalPct, 0) + "</b>. Above about a third the register is top heavy.</p></div></div>";
+  return panel(2, "Severity mix", "The share of the register in each rating band, before controls.", body);
+}
+
+/* ---------- visual 3: category stacked bars ---------- */
+function viewCategories(a, f) {
+  const groups = a.byCategory.slice(0, 7);
+  if (!groups.length) return "";
+  const max = Math.max(1, ...groups.map((g) => g.total));
+  const rows = groups.map((g) => {
+    const segs = RATINGS.map((x) => {
+      const n = x === "Critical" ? g.critical : x === "High" ? g.high : x === "Medium" ? g.medium : g.low;
+      return n ? '<span style="width:' + (n / g.total) * 100 + "%;background:" + RATING_HEX[x] +
+        '" title="' + x + ": " + n + '"></span>' : "";
+    }).join("");
+    return '<button class="row act' + (f.category === g.name ? " on" : "") + '" type="button" data-act="category:' + esc(g.name) + '">' +
+      '<span class="name" title="' + esc(g.name) + '">' + esc(g.name) + "</span>" +
+      '<span class="track" style="width:' + (g.total / max) * 100 + '%">' + segs + "</span>" +
+      '<span class="cnt num">' + num(g.total) + "</span></button>";
+  }).join("");
+  const body = '<div class="rows">' + rows + "</div>" +
+    '<p class="legend">' + RATINGS.map((x) => '<span><i style="background:' + RATING_HEX[x] + '"></i>' + x + "</span>").join("") + "</p>";
+  return panel(3, "Risk by category", "Top seven categories by count, each bar split by rating. Tap a bar to filter.", body);
+}
+
+/* ---------- visual 4: inherent vs residual ---------- */
+function viewReduction(a) {
+  const rows = a.inherentVsResidual.filter((g) => g.inherent > 0).slice(0, 6);
+  if (!rows.length) return "";
+  const bar = (v, colour) =>
+    '<span class="pt"><span style="width:' + Math.min(100, (v / 25) * 100) + "%;background:" + colour + '"></span></span>' +
+    '<span class="pv num">' + round1(v) + "</span>";
+  const body = '<div class="pairs">' + rows.map((g) => {
+    const cut = g.inherent > 0 ? ((g.inherent - g.residual) / g.inherent) * 100 : 0;
+    const tone = cut >= 30 ? "var(--low)" : cut >= 10 ? "var(--med)" : "var(--crit)";
+    return '<div class="pair"><div class="ph"><span class="name" title="' + esc(g.name) + '">' + esc(g.name) + "</span>" +
+      '<span class="cut" style="color:' + tone + '">' + (cut > 0 ? "\u2212" + pct(cut, 0) : "no change") + "</span></div>" +
+      '<div class="pr"><span class="pl">Before</span>' + bar(g.inherent, "#8C79BE") + "</div>" +
+      '<div class="pr"><span class="pl">After</span>' + bar(g.residual, "var(--plum)") + "</div></div>";
+  }).join("") + "</div>" +
+    '<p class="foot">Average score out of 25 per category. The gap is what your controls are worth, so a category with almost no gap is the one to look at first.</p>';
+  return panel(4, "What controls are worth", "Average score before and after controls, for the six categories carrying the most exposure.", body);
+}
+
+/* ---------- visual 5: direction of travel ---------- */
+function viewTrend(a, f) {
+  const items = a.trendBreakdown.slice();
+  const notSet = a.metrics.total - items.reduce((s, t) => s + t.count, 0);
+  if (notSet > 0) items.push({ trend: "Not Set", count: notSet, percentage: shareOf(notSet, a.metrics.total || 1) });
+  const max = Math.max(1, ...items.map((t) => t.count));
+  const hex = Object.assign({}, TREND_HEX, { "Not Set": "#DED8EE" });
+  const arrow = { Increasing: "\u2197", Stable: "\u2192", Decreasing: "\u2198", "Not Set": "\u2013" };
+  const cols = items.map((t) => {
+    const on = f.trend === t.trend;
+    const clickable = t.trend !== "Not Set";
+    return '<' + (clickable ? "button" : "div") + ' class="col' + (on ? " on" : "") + '"' +
+      (clickable ? ' type="button" data-act="trend:' + t.trend + '"' : "") + ">" +
+      '<span class="cv num">' + num(t.count) + "</span>" +
+      '<span class="cb" style="height:' + Math.max(4, (t.count / max) * 108) + "px;background:" + hex[t.trend] + '"></span>' +
+      '<span class="cl">' + arrow[t.trend] + " " + (t.trend === "Not Set" ? "Not set" : t.trend) + "</span>" +
+      '<span class="cp num">' + pct(t.percentage, 0) + "</span></" + (clickable ? "button" : "div") + ">";
+  }).join("");
+  const body = '<div class="cols">' + cols + "</div>" +
+    '<p class="foot">Rising risks matter more than their score alone: a High risk that is worsening will outrank a stable Critical in the priority list.</p>';
+  return panel(5, "Direction of travel", "Whether each risk is getting worse, holding steady or easing off.", body);
+}
+
+/* ---------- visual 6: action timeline ---------- */
+function viewTimeline(a, filtered) {
+  const open = filtered.filter((r) => !r.isClosed);
+  const buckets = [
+    { k: "Past due", n: open.filter((r) => r.isOverdue).length, c: "var(--crit)", act: "overdue" },
+    { k: "Next 30 days", n: open.filter((r) => r.daysUntilDue != null && r.daysUntilDue >= 0 && r.daysUntilDue <= 30).length, c: "var(--high)" },
+    { k: "31 to 90 days", n: open.filter((r) => r.daysUntilDue != null && r.daysUntilDue > 30 && r.daysUntilDue <= 90).length, c: "var(--med)" },
+    { k: "Beyond 90 days", n: open.filter((r) => r.daysUntilDue != null && r.daysUntilDue > 90).length, c: "var(--low)" },
+    { k: "No date set", n: open.filter((r) => !r.dueDate).length, c: "#B7ADD6" },
+  ];
+  const max = Math.max(1, ...buckets.map((b) => b.n));
+  const cols = buckets.map((b) =>
+    '<' + (b.act ? "button" : "div") + ' class="col' + (b.act && state.filters.overdueOnly ? " on" : "") + '"' +
+    (b.act ? ' type="button" data-act="' + b.act + '"' : "") + ">" +
+    '<span class="cv num">' + num(b.n) + "</span>" +
+    '<span class="cb" style="height:' + Math.max(4, (b.n / max) * 108) + "px;background:" + b.c + '"></span>' +
+    '<span class="cl">' + b.k + "</span></" + (b.act ? "button" : "div") + ">").join("");
+
+  const list = (heading, rows, empty) =>
+    "<div><h4>" + heading + "</h4>" + (rows.length
+      ? "<ul>" + rows.slice(0, 5).map((r) => '<li data-risk="' + esc(r.id) + '"><span>' + esc(clip(r.title, 46)) + "</span>" + dueTag(r) + "</li>").join("") +
+        (rows.length > 5 ? '<li class="rest">+ ' + (rows.length - 5) + " more</li>" : "") + "</ul>"
+      : '<p class="empty">' + empty + "</p>") + "</div>";
+
+  const body = '<div class="cols">' + cols + "</div>" +
+    '<div class="dl">' + list("Longest overdue", a.overdueRisks, "Nothing is overdue.") +
+    list("Due next", a.dueSoonRisks, "Nothing falls due this month.") + "</div>";
+  return panel(6, "Action timeline", "When the mitigation for each open risk is due, and what has already slipped.", body);
+}
+
+/* ---------- priority list ---------- */
+function viewPriority(a) {
+  if (!a.priorityRisks.length) return plain("Deal with these first", "", '<p class="empty">No open risks in this selection.</p>');
+  const items = a.priorityRisks.slice(0, 5).map((p) => {
+    const r = p.risk;
+    return '<li data-risk="' + esc(r.id) + '"><span class="rank num"></span><div>' +
+      '<div class="t">' + esc(r.title) + "</div>" +
+      '<div class="m">' + esc(p.reasons.slice(0, 3).join(", ") || "Highest scoring open risk") + "</div>" +
+      '<div class="bl">' + badge(r.inherentRating, r.inherentScore) +
+      '<span class="tag">' + esc(r.owner) + "</span>" + dueTag(r) +
+      '<span class="tag">priority ' + p.score + "</span></div></div></li>";
+  }).join("");
+  return plain("Deal with these first",
+    "The five open risks with the highest priority score. The line under each title is the rules that put it there.",
+    '<ol class="top">' + items + "</ol>");
+}
+
+/* ---------- register table ---------- */
+const SHOW_ROWS = 12;
+function viewTable(filtered) {
+  const rows = filtered.slice().sort((x, y) => (y.inherentScore || 0) - (x.inherentScore || 0));
+  if (!rows.length) return plain("Every risk", "", '<p class="empty">No risk matches those filters.</p>', "register");
+  const shown = state.showAll ? rows : rows.slice(0, SHOW_ROWS);
+  const body = shown.map((r) =>
+    '<tr data-risk="' + esc(r.id) + '">' +
+    '<td><div class="rt">' + esc(r.title) + "</div>" +
+    (r.description ? '<div class="desc">' + esc(clip(r.description, 88)) + "</div>" : "") + "</td>" +
+    "<td>" + esc(r.category) + "</td><td>" + esc(r.owner) + "</td>" +
+    "<td>" + badge(r.inherentRating, r.inherentScore) + "</td>" +
+    "<td>" + badge(r.residualRating, r.residualScore) + "</td>" +
+    '<td><span class="tag">' + esc(r.status) + "</span></td>" +
+    "<td>" + dueTag(r) + "</td></tr>").join("");
+  const table = '<div class="scroll"><table><thead><tr>' +
+    ["Risk", "Category", "Owner", "Before controls", "After controls", "Status", "Action due"]
+      .map((h) => "<th>" + h + "</th>").join("") +
+    "</tr></thead><tbody>" + body + "</tbody></table></div>";
+  const more = '<div class="more">' +
+    (rows.length > SHOW_ROWS
+      ? '<button class="chip" type="button" data-act="toggleAll">' +
+        (state.showAll ? "Show first " + SHOW_ROWS : "Show all " + num(rows.length)) + "</button>" : "") +
+    "<span>Sorted by score before controls. Tap a row for the full record.</span></div>";
+  return '<section class="card" id="register"><div class="phead"><div><h2>Every risk</h2>' +
+    '<p class="hint">' + num(rows.length) + " risk" + (rows.length === 1 ? "" : "s") + " in this selection</p></div></div>" +
+    '<div class="body flush">' + table + "</div>" + more + "</section>";
+}
+
+/* ---------- detail ---------- */
+function renderSheet() {
+  const host = document.getElementById("sheetHost");
+  const r = state.risks.find((x) => x.id === state.selectedId);
+  if (!r) { host.innerHTML = ""; return; }
+  const kv = (label, value, wide) => value
+    ? '<div' + (wide ? ' class="wide"' : "") + "><span>" + esc(label) + "</span>" + esc(value) + "</div>" : "";
+  const box = (heading, p, i, score, rating) =>
+    '<div class="sc"><small>' + heading + "</small><b>" + (score == null ? "\u2013" : score) + "</b>" +
+    badge(rating, null) + '<small class="sm">' +
+    (p ? "Probability " + p + " (" + P_LABEL[p] + ")" : "Probability not set") + "<br>" +
+    (i ? "Impact " + i + " (" + I_LABEL[i] + ")" : "Impact not set") + "</small></div>";
+
+  host.innerHTML = '<div class="veil" data-close="1"><div class="sheet">' +
+    '<button class="x" type="button" data-close="1" aria-label="Close">&times;</button>' +
+    '<p class="eyebrow">' + esc(r.id) + " \u00b7 " + esc(r.category) + "</p><h2>" + esc(r.title) + "</h2>" +
+    '<div class="bl">' + badge(r.inherentRating, r.inherentScore) + '<span class="tag">' + esc(r.status) + "</span>" +
+    dueTag(r) + (r.escalationRequired ? '<span class="tag late">Escalation flagged</span>' : "") + "</div>" +
+    (r.description ? '<p class="sdesc">' + esc(r.description) + "</p>" : "") +
+    '<div class="sect"><h3>Scores</h3><div class="scores">' +
+    box("Before controls", r.probability, r.impact, r.inherentScore, r.inherentRating) +
+    box("After controls", r.residualProbability, r.residualImpact, r.residualScore, r.residualRating) +
+    "</div></div>" +
+    '<div class="sect"><h3>Ownership</h3><div class="kv">' +
+    kv("Risk owner", r.owner) + kv("Business unit", r.businessUnit) +
+    kv("Department", r.department) + kv("Direction", r.trend) + "</div></div>" +
+    '<div class="sect"><h3>Controls and actions</h3><div class="kv">' +
+    kv("Control effectiveness", r.controlEffectiveness) + kv("Action status", r.mitigationStatus) +
+    kv("Action owner", r.mitigationOwner) + kv("Action due", r.dueDate ? fmtDate(r.dueDate) : "Not set") +
+    kv("Current controls", r.controls, true) + kv("Mitigation plan", r.mitigationPlan, true) + "</div></div>" +
+    '<div class="sect"><h3>Review</h3><div class="kv">' +
+    kv("Identified", r.dateIdentified ? fmtDate(r.dateIdentified) : "") +
+    kv("Last reviewed", r.lastReviewDate ? fmtDate(r.lastReviewDate) : "") +
+    kv("Next review", r.nextReviewDate ? fmtDate(r.nextReviewDate) : "") +
+    kv("Row in your file", String(r.rowNumber)) + kv("Comments", r.comments, true) + "</div></div>" +
+    (r.dataIssues.length
+      ? '<div class="sect"><h3>Gaps in the sheet</h3><div class="gaps">Fix these in the register so the score can be trusted.<ul>' +
+        r.dataIssues.map((x) => "<li>" + esc(x) + "</li>").join("") + "</ul></div></div>"
+      : "") + "</div></div>";
+}
+
+/* ---------- empty ---------- */
+function renderEmpty() {
+  document.getElementById("bar").style.display = "none";
+  document.getElementById("srcLine").textContent = state.error ? state.error : "No register loaded";
+  document.getElementById("view").innerHTML =
+    '<section class="card start"><div class="body pad">' +
+    "<h2>Start with your risk register</h2>" +
+    '<p>Choose an Excel file (.xlsx) or CSV. It is read here in your browser, nothing is sent anywhere, ' +
+    "and the six visuals build themselves from your rows.</p>" +
+    (state.error ? '<div class="err">' + esc(state.error) + "</div>" : "") +
+    '<div class="startrow">' +
+    '<label class="go" for="fileInput">Choose file</label>' +
+    (state.reading ? '<span class="reading">Reading ' + esc(state.reading) + "\u2026</span>"
+      : '<span class="quiet">.xlsx, .xlsm, .csv or .tsv</span>') + "</div>" +
+    '<div class="needs"><p class="nh">What the sheet needs</p><ul>' +
+    "<li>A header row with the risks underneath it.</li>" +
+    "<li>Per risk at least a <b>title</b>, a <b>probability</b> and an <b>impact</b> \u2014 either 1 to 5 or words like Likely and Severe.</li>" +
+    "<li>Add residual probability and impact to fill the after-controls views.</li>" +
+    "<li>Add owner, category, status, plan, due date, trend and escalation flag to fill the rest.</li>" +
+    "<li>Alternative column names work too: Likelihood, Severity, Assignee, Due Date, Level of Control.</li>" +
+    "</ul></div></div></section>";
+  renderSheet();
+}
+
+/* ---------- render ---------- */
+function render() {
+  if (!state.risks.length) { renderEmpty(); return; }
+  document.getElementById("bar").style.display = "";
+  const filtered = applyFilters(state.risks, state.filters);
+  const a = computeAnalytics(filtered, state.risks.length);
+  renderChrome(a, filtered);
+
+  const gaps = state.risks.filter((r) => r.dataIssues.length).length;
+  const note = gaps
+    ? '<p class="note">' + num(gaps) + " of " + num(state.risks.length) +
+      " rows have something missing, usually an owner, a date or a score. Open a risk to see what." +
+      (state.unmapped && state.unmapped.length
+        ? " Columns not used: " + esc(state.unmapped.slice(0, 5).join(", ")) + "." : "") + "</p>"
+    : "";
+
+  document.getElementById("view").innerHTML =
+    note + viewHealth(a) + viewStats(a.metrics, state.filters) +
+    '<div class="two">' + viewMatrix(a, state.filters) + viewDonut(a, state.filters) + "</div>" +
+    '<div class="two">' + viewCategories(a, state.filters) + viewReduction(a) + "</div>" +
+    '<div class="two">' + viewTrend(a, state.filters) + viewTimeline(a, filtered) + "</div>" +
+    viewPriority(a) + viewTable(filtered);
+  renderSheet();
+}
+
+/* ---------- interaction ---------- */
+function setFilters(patch) { Object.assign(state.filters, patch); state.showAll = false; render(); }
+
+function handleAct(act) {
+  if (!act) return;
+  if (act === "reset") { state.filters = Object.assign({}, EMPTY_FILTERS); state.showAll = false; render(); return; }
+  if (act === "overdue") { setFilters({ overdueOnly: !state.filters.overdueOnly }); return; }
+  if (act === "toggleAll") { state.showAll = !state.showAll; render(); return; }
+  if (act.startsWith("basis:")) { state.basis = act.slice(6); state.filters.cell = null; render(); return; }
+  if (act.startsWith("cell:")) {
+    const bits = act.split(":");
+    if (bits[1] === "none") { setFilters({ cell: null }); return; }
+    const p = +bits[1], i = +bits[2], cur = state.filters.cell;
+    const same = cur && cur.p === p && cur.i === i && cur.basis === state.basis;
+    setFilters({ cell: same ? null : { p, i, basis: state.basis } });
+    return;
+  }
+  const cut = act.indexOf(":");
+  if (cut < 0) return;
+  const k = act.slice(0, cut), v = act.slice(cut + 1);
+  if (k === "rating" || k === "category" || k === "trend") {
+    setFilters({ [k]: v === ALL || state.filters[k] === v ? ALL : v });
+  }
+}
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-close]")) { state.selectedId = null; renderSheet(); return; }
+  const act = e.target.closest("[data-act]");
+  if (act) { handleAct(act.getAttribute("data-act")); return; }
+  const row = e.target.closest("[data-risk]");
+  if (row) { state.selectedId = row.getAttribute("data-risk"); renderSheet(); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && state.selectedId) { state.selectedId = null; renderSheet(); return; }
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const act = e.target.closest && e.target.closest('[data-act][tabindex="0"]');
+  if (act) { e.preventDefault(); handleAct(act.getAttribute("data-act")); }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "q") return;
+  state.filters.search = e.target.value;
+  state.showAll = false;
+  render();
+  const box = document.getElementById("q");
+  if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+});
+document.getElementById("fileInput").addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (file) void readWorkbook(file);
+});
+document.getElementById("printBtn").addEventListener("click", () => window.print());
+document.getElementById("clearBtn").addEventListener("click", async () => {
+  await clearSavedRegister();
+  state.risks = []; state.source = ""; state.error = null; state.selectedId = null;
+  state.filters = Object.assign({}, EMPTY_FILTERS);
+  render();
+});
+
+/* ---------- boot ---------- */
+render();
+void (async () => {
+  const saved = await loadSavedRegister();
+  if (state.risks.length) return;
+  if (!saved || !Array.isArray(saved.records) || !saved.records.length) return;
+  try {
+    loadRows(saved.records, saved.name || "Saved register", saved.sheetName || "");
+    state.unmapped = saved.unmapped || [];
+    state.restored = true;
+    if (saved.savedAt) state.loadedAt = new Date(saved.savedAt);
+  } catch (err) {
+    await clearSavedRegister();
+  }
+  render();
+})();
+</script>
+</body>
+</html>
